@@ -1,0 +1,6 @@
+
+Job State
+isActive >> false
+isCancelled >> false
+isCompleted >> true
+

@@ -176,17 +176,22 @@ class CoroutineDispatcherTests {
     }
 
     /**
+     * `Dispatchers.IO`의 `limitedParallelism` 함수는 **공유 스레드 풀 상에서 `Dispatchers.IO`나 `Dispatchers.Default`와 관계 없는 스레드로 구성된 스레드 풀**을 만들어낸다.
      *
+     * 만들어낼 수 있는 스레드에 제한이 있는 `Dispatchers.IO`나 `Dispatchers.Default`와 달리 스레드의 수를 제한 없이 만들어낼 수 있다.
+     *
+     * 이 함수는 특정한 작업이 다른 작업에 영향을 받지 않아야 해, 별도 스레드 풀에서 실행되는 것이 필요할 때 사용돼야 한다.
      */
     @Test
     fun DisPatchers_IO의_limitedParallelism() = runBlocking<Unit> {}
 
     /**
+     * `Dispatchers.Main`은 UI가 있는 애플리케이션에서 메인 스레드의 사용을 위해 사용되는 특별한 CoroutineDispatcher 객체이다.
      *
+     * 별도 라이브러리(kotlinx-coroutines-android 등)를 추가해야 해당 객체를 사용할 수 있다.
      */
     @Test
     fun Dispatchers_Main() = runBlocking<Unit> {
-
     }
 
 }
