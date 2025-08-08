@@ -3,6 +3,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
+import kotlin.coroutines.resume
 import kotlin.test.Test
 
 class AdvancedCoroutineTests {
@@ -206,9 +207,90 @@ class AdvancedCoroutineTests {
         }
     }
 
+    /**
+     * 무제한 디스패처를 사용하는 코루틴은 현재 자신을 실행한 스레드를 즉시 점유해 실행되며, 이는 제한된 디스패처를 사용하는 코루틴의 동작과 대조된다.
+     *
+     * 제한된 디스패처는 코루틴의 실행을 요청 받으면 작업 대기열에 적재한 후 해당 디스패처에서 사용할 수 있는 스레드 중 하나로 보내 실행되도록한다.
+     */
+    @Test
+    fun 무제한_디스패처는_코루틴이_자신을_생성한_스레드에서_즉시_실행된다() = runBlocking<Unit>(Dispatchers.IO) {
+        println("runBlocking 코루틴 실행 스레드: ${Thread.currentThread().name}")
+        launch(Dispatchers.Unconfined) {
+            println("launch 코루틴 실행 스레드: ${Thread.currentThread().name}")
+        }
+    }
 
     @Test
-    fun 무제한_디스패처는_코루틴이_자신을_생성한_스레드에서_즉시_실행된다() = runBlocking<Unit> {
+    fun 무제한_디스패처를_사용해_실행되는_코루틴은_스레드_스위칭_없이_즉시_실행된다() = runBlocking<Unit> {
+        println("작업1")
+        launch(Dispatchers.Unconfined) {
+            println("작업2")
+        }
+        println("작업3")
+    }
 
+    /**
+     * 무제한 디스패처를 사용해 실행되는 코루틴은 자신을 실행시킨 스레드에서 스레드 스위칭 없이 즉시 실행되지만
+     * 일시 중단 전까지만 자신을 실행시킨 스레드에서 실행된다.
+     *
+     * DefaultExecutor 스레드는 delay 함수를 실행하는 스레드로 delay 함수가 일시 중단을 종료하고 코루틴을 재개할 때 사용하는 스레드이다.
+     */
+    @Test
+    fun 중단_시점_이후의_재개는_코루틴을_재개하는_스레드에서_한다() = runBlocking<Unit> {
+        launch(Dispatchers.Unconfined) {
+            println("일시 중단 전 실행 스레드: ${Thread.currentThread().name}")
+            delay(100L)
+            println("일시 중단 후 실행 스레드: ${Thread.currentThread().name}")
+        }
+    }
+
+    /**
+     * CoroutineStart.UNDISPATCHED 옵션이 적용된 코루틴은 시작과 재개가 모두 메인 스레드에서 일어나고,
+     * Dispatcher.Unconfined를 사용해 실행된 코루틴은 시작은 메인 스레드에서 됐지만
+     * 재개는 delay를 실행하는 데 사용하는 DefaultExecutor 스레드에서 재개된다.
+     */
+    @Test
+    fun CoroutineStart_UNDISPATCHER와_무제한_디스패처의_차이() = runBlocking<Unit> {
+        println("runBlocking 코루틴 실행 스레드: ${Thread.currentThread().name}")
+        launch(start = CoroutineStart.UNDISPATCHED) {
+            println("[CoroutineStart.UNDISPATCHED] 코루틴이 시작 시 사용하는 스레드: ${Thread.currentThread().name}")
+            delay(100L)
+            println("[CoroutineStart.UNDISPATCHED] 코루틴이 재개 시 사용하는 스레드: ${Thread.currentThread().name}")
+        }.join()
+
+        launch(context = Dispatchers.Unconfined) {
+            println("[Dispatchers.Unconfined] 코루틴이 시작 시 사용하는 스레드: ${Thread.currentThread().name}")
+            delay(100L)
+            println("[Dispatchers.Unconfined] 코루틴이 재개 시 사용하는 스레드: ${Thread.currentThread().name}")
+        }.join()
+    }
+
+    /**
+     * 코루틴은 코드를 실행하는 도중 일시 중단하고 다른 작업으로 전환한 후 필요한 시점에 다시 실행을 재개하는 기능을 지원한다.
+     *
+     * 코루틴이 일시 중단을 하고 재개하기 위해서는 코루틴의 실행 정보가 어딘가에 저장돼 전달해야 한다.
+     *
+     * 코틀린은 코루틴의 실행 정보를 저장하고 전달하는 데 CPS(Continuation Passing Style)라고 불리는 프로그래밍 방식을 채택하고 있다.
+     *
+     * CPS를 채택한 코틀린은 코루틴에서 이어서 실행해야 하는 작업 전달을 위해 Continuation 객체를 제공한다.
+     *
+     * Continuation 객체는 코루틴의 일시 중단 시점에 코루틴의 실행 상태를 저장하며, 여기에는 다음에 실행해야 할 작업에 대한 정보가 포함된다.
+     */
+    @Test
+    fun Continuation_Passing_Style() {
+    }
+
+    /**
+     * 코루틴에서 일시 중단이 일어나면 Continuation 객체에 실행 정보가 저장되며,
+     * 일시 중단된 코루틴은 Continuation 객체에 대해 reseme 함수가 호출돼야 재개된다.
+     */
+    @Test
+    fun 코루틴의_일시_중단과_재개로_알아보는_Continuation() = runBlocking<Unit> {
+        println("runBlocking 코루틴 일시 중단 호출")
+        suspendCancellableCoroutine<Unit> { continuation: CancellableContinuation<Unit> ->
+            println("일시 중단 시점의 runBlocking 코루틴 실행 정보: ${continuation.context}")
+            continuation.resume(Unit)
+        }
+        println("일시 중단된 코루틴이 재개되지 않아 실행되지 않는 코드")
     }
 }
