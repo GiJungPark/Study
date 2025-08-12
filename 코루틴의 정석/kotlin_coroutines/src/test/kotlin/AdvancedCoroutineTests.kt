@@ -3,6 +3,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.thread
 import kotlin.coroutines.resume
 import kotlin.test.Test
 
@@ -283,6 +284,9 @@ class AdvancedCoroutineTests {
     /**
      * 코루틴에서 일시 중단이 일어나면 Continuation 객체에 실행 정보가 저장되며,
      * 일시 중단된 코루틴은 Continuation 객체에 대해 reseme 함수가 호출돼야 재개된다.
+     *
+     * delay 일시 중단 함수에서도 비슷하게 코루틴을 일시 중단하고 특정 시점 이후에 복구되도록 한다.
+     * - suspendCancellableCoroutine 호출 -> scheduleResumeAfterDelay 함수를 통해 일정 시간 이후에 Continuation 객체를 재개
      */
     @Test
     fun 코루틴의_일시_중단과_재개로_알아보는_Continuation() = runBlocking<Unit> {
@@ -292,5 +296,20 @@ class AdvancedCoroutineTests {
             continuation.resume(Unit)
         }
         println("일시 중단된 코루틴이 재개되지 않아 실행되지 않는 코드")
+    }
+
+    /**
+     * 코루틴 재개 시 다른 작업으로부터 결과를 수신받아야 하는 경우에는
+     * suspend CancellableCoroutine 함수의 타입 인자에 결과로 반환받는 타입을 입력하면 된다.
+     */
+    @Test
+    fun 다른_작업으로부터_결과_수신해_코루틴_재개하기() = runBlocking<Unit> {
+        val result = suspendCancellableCoroutine<String> { continuation: CancellableContinuation<String> ->
+            thread {
+                Thread.sleep(1000)
+                continuation.resume("실행 결과")
+            }
+        }
+        println(result)
     }
 }
