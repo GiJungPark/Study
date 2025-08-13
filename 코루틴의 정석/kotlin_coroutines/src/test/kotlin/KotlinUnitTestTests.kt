@@ -3,6 +3,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.*
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -274,5 +275,36 @@ class KotlinUnitTestTests {
         }.join()
 
         println("가상 시간: ${currentTime}ms, result: ${result}")
+    }
+
+    @Test
+    fun `updateStringWithDelay("ABC")가 호출되면 문자열이 ABC로 변경된다`() = runTest {
+        // Given
+        val testDispatcher = StandardTestDispatcher()
+        val stringStateHolder = StringStateHolder(testDispatcher)
+
+        // When
+        stringStateHolder.updateStringWithDelay("ABC")
+
+        // Then
+        testDispatcher.scheduler.advanceUntilIdle()
+        Assertions.assertEquals("ABC", stringStateHolder.stringState)
+    }
+
+    @Test
+    fun `backgroundScope를 사용하는 테스트`() = runTest {
+        var result = 0
+
+        backgroundScope.launch {
+            while(true) {
+                delay(1000L)
+                result += 1
+            }
+        }
+
+        advanceTimeBy(1500L)
+        Assertions.assertEquals(1, result)
+        advanceTimeBy(1000L)
+        Assertions.assertEquals(2, result)
     }
 }
